@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import glob
 
+
 # compute rollout between attention layers
 def compute_rollout_attention(all_layer_matrices, start_layer=0):
     # adding residual consideration- code adapted from https://github.com/samiraabnar/attention_flow
@@ -17,6 +18,7 @@ def compute_rollout_attention(all_layer_matrices, start_layer=0):
         joint_attention = matrices_aug[i].bmm(joint_attention)
     return joint_attention
 
+
 class Generator:
     def __init__(self, model):
         self.model = model
@@ -30,14 +32,14 @@ class Generator:
         output = self.model(input_ids=input_ids, attention_mask=attention_mask)[0]
         kwargs = {"alpha": 1}
 
-        if index == None:
+        if index is None:
             index = np.argmax(output.cpu().data.numpy(), axis=-1)
 
         one_hot = np.zeros((1, output.size()[-1]), dtype=np.float32)
         one_hot[0, index] = 1
         one_hot_vector = one_hot
         one_hot = torch.from_numpy(one_hot).requires_grad_(True)
-        one_hot = torch.sum(one_hot.cuda() * output)
+        one_hot = torch.sum(one_hot * output)
 
         self.model.zero_grad()
         one_hot.backward(retain_graph=True)
@@ -57,7 +59,6 @@ class Generator:
         rollout = compute_rollout_attention(cams, start_layer=start_layer)
         rollout[:, 0, 0] = rollout[:, 0].min()
         return rollout[:, 0]
-
 
     def generate_LRP_last_layer(self, input_ids, attention_mask,
                      index=None):
@@ -87,7 +88,7 @@ class Generator:
         output = self.model(input_ids=input_ids, attention_mask=attention_mask)[0]
         kwargs = {"alpha": 1}
 
-        if index == None:
+        if index is None:
             index = np.argmax(output.cpu().data.numpy(), axis=-1)
 
         one_hot = np.zeros((1, output.size()[-1]), dtype=np.float32)

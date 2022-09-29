@@ -1,3 +1,6 @@
+import sys
+from pprint import pprint
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -52,7 +55,7 @@ class RelPropSimple(RelProp):
         S = safe_divide(R, Z)
         C = self.gradprop(Z, self.X, S)
 
-        if torch.is_tensor(self.X) == False:
+        if not torch.is_tensor(self.X):
             outputs = []
             outputs.append(self.X[0] * C[0])
             outputs.append(self.X[1] * C[1])
@@ -60,41 +63,54 @@ class RelPropSimple(RelProp):
             outputs = self.X * (C[0])
         return outputs
 
+
 class AddEye(RelPropSimple):
     # input of shape B, C, seq_len, seq_len
     def forward(self, input):
         return input + torch.eye(input.shape[2]).expand_as(input).to(input.device)
 
+
 class ReLU(nn.ReLU, RelProp):
     pass
+
 
 class GELU(nn.GELU, RelProp):
     pass
 
+
 class Softmax(nn.Softmax, RelProp):
     pass
+
 
 class Mul(RelPropSimple):
     def forward(self, inputs):
         return torch.mul(*inputs)
 
+
 class Tanh(nn.Tanh, RelProp):
     pass
+
+
 class LayerNorm(nn.LayerNorm, RelProp):
     pass
 
+
 class Dropout(nn.Dropout, RelProp):
     pass
+
 
 class MatMul(RelPropSimple):
     def forward(self, inputs):
         return torch.matmul(*inputs)
 
+
 class MaxPool2d(nn.MaxPool2d, RelPropSimple):
     pass
 
+
 class LayerNorm(nn.LayerNorm, RelProp):
     pass
+
 
 class AdaptiveAvgPool2d(nn.AdaptiveAvgPool2d, RelPropSimple):
     pass
@@ -109,6 +125,8 @@ class Add(RelPropSimple):
         return torch.add(*inputs)
 
     def relprop(self, R, alpha):
+        # TODO Pourquoi forward(self.X), il faudrait avoir au moins 2 tenseurs non ?
+        # Oui, dans l'implem de base, on a toujours 2 tenseur, pk on en a qu'un seul ici ?
         Z = self.forward(self.X)
         S = safe_divide(R, Z)
         C = self.gradprop(Z, self.X, S)
@@ -129,12 +147,14 @@ class Add(RelPropSimple):
 
         return outputs
 
+
 class einsum(RelPropSimple):
     def __init__(self, equation):
         super().__init__()
         self.equation = equation
     def forward(self, *operands):
         return torch.einsum(self.equation, *operands)
+
 
 class IndexSelect(RelProp):
     def forward(self, inputs, dim, indices):
@@ -155,7 +175,6 @@ class IndexSelect(RelProp):
         else:
             outputs = self.X * (C[0])
         return outputs
-
 
 
 class Clone(RelProp):

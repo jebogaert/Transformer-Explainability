@@ -1,21 +1,25 @@
-from transformers import BertPreTrainedModel
+from transformers import RobertaPreTrainedModel, CamembertConfig
 from transformers.utils import logging
 from transformers.modeling_outputs import SequenceClassifierOutput
 from BERT_explainability.modules.layers_ours import *
-from BERT_explainability.modules.BERT.BERT import BertModel
+from BERT_explainability.modules.BERT.BERT import RobertaModel
 from torch.nn import CrossEntropyLoss, MSELoss
 import torch.nn as nn
 from typing import List, Any
 import torch
+from transformers.models.roberta.modeling_roberta import (
+    RobertaForSequenceClassification,
+)
 from BERT_rationale_benchmark.models.model_utils import PaddedSequence
 
 
-class BertForSequenceClassification(BertPreTrainedModel):
+class CamembertForSequenceClassification(RobertaForSequenceClassification):
+    config_class = CamembertConfig
     def __init__(self, config):
         super().__init__(config)
         self.num_labels = config.num_labels
 
-        self.bert = BertModel(config)
+        self.bert = RobertaModel(config)
         self.dropout = Dropout(config.hidden_dropout_prob)
         self.classifier = Linear(config.hidden_size, config.num_labels)
 
@@ -85,12 +89,11 @@ class BertForSequenceClassification(BertPreTrainedModel):
         cam = self.classifier.relprop(cam, **kwargs)
         cam = self.dropout.relprop(cam, **kwargs)
         cam = self.bert.relprop(cam, **kwargs)
-        # print("conservation: ", cam.sum())
         return cam
 
 
 # this is the actual classifier we will be using
-class BertClassifier(nn.Module):
+class CamembertClassifier(nn.Module):
     """Thin wrapper around BertForSequenceClassification"""
 
     def __init__(self,
@@ -101,10 +104,9 @@ class BertClassifier(nn.Module):
                  num_labels: int,
                  max_length: int = 512,
                  use_half_precision=True):
-        super(BertClassifier, self).__init__()
-        bert = BertForSequenceClassification.from_pretrained(bert_dir, num_labels=num_labels)
+        super(CamembertClassifier, self).__init__()
+        bert = CamembertForSequenceClassification.from_pretrained(bert_dir, num_labels=num_labels)
         if use_half_precision:
-            import apex
             bert = bert.half()
         self.bert = bert
         self.pad_token_id = pad_token_id
@@ -174,7 +176,7 @@ if __name__ == '__main__':
 
     print(x['input_ids'])
 
-    model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2)
+    model = CamembertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=2)
     model_save_file = os.path.join('./BERT_explainability/output_bert/movies/classifier/', 'classifier.pt')
     model.load_state_dict(torch.load(model_save_file))
 
