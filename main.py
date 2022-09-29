@@ -3,7 +3,7 @@ import webbrowser
 from transformers import CamembertConfig
 from BERT_explainability.modules.BERT.ExplanationGenerator import Generator
 from BERT_explainability.modules.BERT.BertForSequenceClassification import CamembertForSequenceClassification
-
+from torchinfo import summary
 from captum.attr import (
     visualization
 )
@@ -16,11 +16,18 @@ from Transformer_Explainability.BERT_explainability.modules.BERT.BERT import Rob
 
 def ensure_compatibility2(state_dict1, state_dict2):
     l1_compat = {}
-    for key, value in state_dict1.items():
-        l1_compat[key.replace("roberta", "bert")] = value
+    for item1, item2 in zip(state_dict1.items(), state_dict2.items()):
+        key, value = item1
+        if key != item2[0]:
+            l1_compat[key.replace("roberta", "bert")] = value
+        else:
+            l1_compat[key] = value
 
     l1_compat["classifier.weight"] = state_dict1["classifier.out_proj.weight"]
     l1_compat["classifier.bias"] = state_dict1["classifier.out_proj.bias"]
+
+    for elem in l1_compat:
+        print(elem)
 
     return l1_compat
 
@@ -31,8 +38,8 @@ def viz_text():
     model_bert_tok = AutoTokenizer.from_pretrained(r'C:\Users\jerem\OneDrive\Bureau\Pro\CamemBert-LRP\camembert_model')
 
     #compat_dict = ensure_compatibility2(model_bert.state_dict(), model_bert_expl0.state_dict())
-    model_bert_expl = CamembertForSequenceClassification.from_pretrained(r'C:\Users\jerem\OneDrive\Bureau\Pro\CamemBert-LRP\camembert_model')
 
+    model_bert_expl = CamembertForSequenceClassification.from_pretrained(r'C:\Users\jerem\OneDrive\Bureau\Pro\CamemBert-LRP\camembert_model')
     model_bert_expl.eval()
 
     explanations = Generator(model_bert_expl)
@@ -63,7 +70,7 @@ def viz_text():
     expl = (expl - expl.min()) / (expl.max() - expl.min())
 
     # get the model classification
-    output = torch.nn.functional.softmax(model_bert_expl(input_ids=input_ids, attention_mask=attention_mask)[0], dim=-1)
+    output = torch.nn.functional.softmax(model_bert_expl(input_ids=input_ids, attention_mask=attention_mask)[1], dim=-1)
     classification = output.argmax(dim=-1).item()
     # get class name
     class_name = classifications[classification]
@@ -86,6 +93,7 @@ def viz_text():
         1)]
     visualization.visualize_text(vis_data_records)
     print([(tokens[i], expl[i].item()) for i in range(len(tokens))])
+
 
 
 if __name__ == '__main__':

@@ -2,8 +2,8 @@ from transformers import RobertaPreTrainedModel, CamembertConfig
 from transformers.utils import logging
 from transformers.modeling_outputs import SequenceClassifierOutput
 from BERT_explainability.modules.layers_ours import *
-from BERT_explainability.modules.BERT.BERT import RobertaModel
-from torch.nn import CrossEntropyLoss, MSELoss
+from BERT_explainability.modules.BERT.BERT import RobertaModel, RobertaClassificationHead
+from torch.nn import CrossEntropyLoss, MSELoss, BCEWithLogitsLoss
 import torch.nn as nn
 from typing import List, Any
 import torch
@@ -13,17 +13,19 @@ from transformers.models.roberta.modeling_roberta import (
 from BERT_rationale_benchmark.models.model_utils import PaddedSequence
 
 
-class CamembertForSequenceClassification(RobertaForSequenceClassification):
-    config_class = CamembertConfig
+class CamembertForSequenceClassification(RobertaPreTrainedModel):
+    _keys_to_ignore_on_load_missing = [r"position_ids"]
+
     def __init__(self, config):
         super().__init__(config)
         self.num_labels = config.num_labels
+        self.config = config
 
-        self.bert = RobertaModel(config)
-        self.dropout = Dropout(config.hidden_dropout_prob)
-        self.classifier = Linear(config.hidden_size, config.num_labels)
+        self.roberta = RobertaModel(config, add_pooling_layer=False)
+        self.classifier = RobertaClassificationHead(config)
 
-        self.init_weights()
+        # Initialize weights and apply final processing
+        self.post_init()
 
     def forward(
             self,
@@ -47,7 +49,7 @@ class CamembertForSequenceClassification(RobertaForSequenceClassification):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.bert(
+        outputs = self.roberta(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -59,20 +61,31 @@ class CamembertForSequenceClassification(RobertaForSequenceClassification):
             return_dict=return_dict,
         )
 
-        pooled_output = outputs[1]
+        sequence_output = outputs[0]
+        logits = self.classifier(sequence_output)
 
-        pooled_output = self.dropout(pooled_output)
-        logits = self.classifier(pooled_output)
-
-        loss = None
+        loss = 0
         if labels is not None:
-            if self.num_labels == 1:
-                #  We are doing regression
+            if self.config.problem_type is None:
+                if self.num_labels == 1:
+                    self.config.problem_type = "regression"
+                elif self.num_labels > 1 and (labels.dtype == torch.long or labels.dtype == torch.int):
+                    self.config.problem_type = "single_label_classification"
+                else:
+                    self.config.problem_type = "multi_label_classification"
+
+            if self.config.problem_type == "regression":
                 loss_fct = MSELoss()
-                loss = loss_fct(logits.view(-1), labels.view(-1))
-            else:
+                if self.num_labels == 1:
+                    loss = loss_fct(logits.squeeze(), labels.squeeze())
+                else:
+                    loss = loss_fct(logits, labels)
+            elif self.config.problem_type == "single_label_classification":
                 loss_fct = CrossEntropyLoss()
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+            elif self.config.problem_type == "multi_label_classification":
+                loss_fct = BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[2:]
@@ -87,8 +100,7 @@ class CamembertForSequenceClassification(RobertaForSequenceClassification):
 
     def relprop(self, cam=None, **kwargs):
         cam = self.classifier.relprop(cam, **kwargs)
-        cam = self.dropout.relprop(cam, **kwargs)
-        cam = self.bert.relprop(cam, **kwargs)
+        cam = self.roberta.relprop(cam, **kwargs)
         return cam
 
 

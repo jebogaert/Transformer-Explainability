@@ -671,6 +671,7 @@ class RobertaModel(RobertaPreTrainedModel):
         self.embeddings = RobertaEmbeddings(config)
         self.encoder = RobertaEncoder(config)
         self.pooler = RobertaPooler(config) if add_pooling_layer else None
+        self.add_pooling_layer = add_pooling_layer
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -816,8 +817,41 @@ class RobertaModel(RobertaPreTrainedModel):
         )
 
     def relprop(self, cam, **kwargs):
-        cam = self.pooler.relprop(cam, **kwargs)
+        if self.add_pooling_layer:
+            cam = self.pooler.relprop(cam, **kwargs)
         cam = self.encoder.relprop(cam, **kwargs)
+        return cam
+
+
+class RobertaClassificationHead(nn.Module):
+    """Head for sentence-level classification tasks."""
+
+    def __init__(self, config):
+        super().__init__()
+        classifier_dropout = (
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.dropout1 = Dropout(classifier_dropout)
+        self.dense = Linear(config.hidden_size, config.hidden_size)
+        self.tanh = Tanh()
+        self.dropout2 = Dropout(classifier_dropout)
+        self.out_proj = Linear(config.hidden_size, config.num_labels)
+
+    def forward(self, features, **kwargs):
+        x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
+        x = self.dropout1(x)
+        x = self.dense(x)
+        x = self.tanh(x)
+        x = self.dropout2(x)
+        x = self.out_proj(x)
+        return x
+
+    def relprop(self, cam, **kwargs):
+        cam = self.out_proj.relprop(cam, **kwargs)
+        cam = self.dropout2.relprop(cam, **kwargs)
+        cam = self.tanh.relprop(cam, **kwargs)
+        cam = self.dense.relprop(cam, **kwargs)
+        cam = self.dropout1.relprop(cam, **kwargs)
         return cam
 
 
