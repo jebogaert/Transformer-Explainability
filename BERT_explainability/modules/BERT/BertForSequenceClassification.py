@@ -120,7 +120,7 @@ class CamembertClassifier(nn.Module):
         bert = CamembertForSequenceClassification.from_pretrained(bert_dir, num_labels=num_labels)
         if use_half_precision:
             bert = bert.half()
-        self.bert = bert
+        self.roberta = bert
         self.pad_token_id = pad_token_id
         self.cls_token_id = cls_token_id
         self.sep_token_id = sep_token_id
@@ -148,9 +148,9 @@ class CamembertClassifier(nn.Module):
         bert_input = PaddedSequence.autopad(input_tensors, batch_first=True, padding_value=self.pad_token_id,
                                             device=target_device)
         positions = PaddedSequence.autopad(position_ids, batch_first=True, padding_value=0, device=target_device)
-        (classes,) = self.bert(bert_input.data,
-                               attention_mask=bert_input.mask(on=0.0, off=float('-inf'), device=target_device),
-                               position_ids=positions.data)
+        (classes,) = self.roberta(bert_input.data,
+                                  attention_mask=bert_input.mask(on=0.0, off=float('-inf'), device=target_device),
+                                  position_ids=positions.data)
         assert torch.all(classes == classes)  # for nans
 
         print(input_tensors[0])
@@ -159,12 +159,13 @@ class CamembertClassifier(nn.Module):
         return classes
 
     def relprop(self, cam=None, **kwargs):
-        return self.bert.relprop(cam, **kwargs)
+        return self.roberta.relprop(cam, **kwargs)
 
 
 if __name__ == '__main__':
     from transformers import BertTokenizer
     import os
+
 
     class Config:
         def __init__(self, hidden_size, num_attention_heads, attention_probs_dropout_prob, num_labels,
@@ -178,13 +179,13 @@ if __name__ == '__main__':
 
     tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
     x = tokenizer.encode_plus("In this movie the acting is great. The movie is perfect! [sep]",
-                         add_special_tokens=True,
-                         max_length=512,
-                         return_token_type_ids=False,
-                         return_attention_mask=True,
-                         pad_to_max_length=True,
-                         return_tensors='pt',
-                         truncation=True)
+                              add_special_tokens=True,
+                              max_length=512,
+                              return_token_type_ids=False,
+                              return_attention_mask=True,
+                              pad_to_max_length=True,
+                              return_tensors='pt',
+                              truncation=True)
 
     print(x['input_ids'])
 
@@ -212,7 +213,7 @@ if __name__ == '__main__':
 
     cam, _ = model.relprop()
 
-    #print(cam.shape)
+    # print(cam.shape)
 
     cam = cam.sum(-1)
-    #print(cam)
+    # print(cam)

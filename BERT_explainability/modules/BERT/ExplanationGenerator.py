@@ -136,8 +136,8 @@ class Generator:
         one_hot = np.zeros((1, output.size()[-1]), dtype=np.float32)
         one_hot[0, index] = 1
         one_hot_vector = one_hot
-        one_hot = torch.from_numpy(one_hot).requires_grad_(True)
-        one_hot = torch.sum(one_hot.cuda() * output)
+        one_hot = torch.from_numpy(one_hot).requires_grad_(True).to(input_ids.device)
+        one_hot = torch.sum(one_hot * output)
 
         self.model.zero_grad()
         one_hot.backward(retain_graph=True)
