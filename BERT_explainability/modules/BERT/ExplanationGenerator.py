@@ -62,7 +62,7 @@ class Generator:
 
     def generate_LRP_last_layer(self, input_ids, attention_mask,
                      index=None):
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[0]
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1]
         kwargs = {"alpha": 1}
         if index == None:
             index = np.argmax(output.cpu().data.numpy(), axis=-1)
@@ -85,7 +85,7 @@ class Generator:
 
     def generate_full_lrp(self, input_ids, attention_mask,
                      index=None):
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[0]
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1]
         kwargs = {"alpha": 1}
 
         if index is None:
@@ -107,7 +107,7 @@ class Generator:
 
     def generate_attn_last_layer(self, input_ids, attention_mask,
                      index=None):
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[0]
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1]
         cam = self.model.roberta.encoder.layer[-1].attention.self.get_attn()[0]
         cam = cam.mean(dim=0).unsqueeze(0)
         cam[:, 0, 0] = 0
@@ -115,7 +115,7 @@ class Generator:
 
     def generate_rollout(self, input_ids, attention_mask, start_layer=0, index=None):
         self.model.zero_grad()
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[0]
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1]
         blocks = self.model.roberta.encoder.layer
         all_layer_attentions = []
         for blk in blocks:
@@ -127,7 +127,7 @@ class Generator:
         return rollout[:, 0]
 
     def generate_attn_gradcam(self, input_ids, attention_mask, index=None):
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[0]
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1]
         kwargs = {"alpha": 1}
 
         if index == None:
