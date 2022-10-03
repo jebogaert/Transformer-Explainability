@@ -29,7 +29,7 @@ class Generator:
 
     def generate_LRP(self, input_ids, attention_mask,
                      index=None, start_layer=11):
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1]
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1].to(input_ids.device)
         kwargs = {"alpha": 1}
 
         if index is None:
@@ -38,7 +38,7 @@ class Generator:
         one_hot = np.zeros((1, output.size()[-1]), dtype=np.float32)
         one_hot[0, index] = 1
         one_hot_vector = one_hot
-        one_hot = torch.from_numpy(one_hot).requires_grad_(True)
+        one_hot = torch.from_numpy(one_hot).requires_grad_(True).to(input_ids.device)
         one_hot = torch.sum(one_hot * output)
 
         self.model.zero_grad()
