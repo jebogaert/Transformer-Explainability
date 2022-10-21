@@ -366,24 +366,30 @@ class RobertaSelfAttention(nn.Module):
         self.attn_cam = None
         self.attn = None
         self.attn_gradients = None
-
-    def get_attn(self):
-        return self.attn
-
+        
     def save_attn(self, attn):
         self.attn = attn
+        
+    def get_attn(self):
+        attn_copy = self.attn.detach()
+        del self.attn
+        return attn_copy
 
     def save_attn_cam(self, cam):
         self.attn_cam = cam
 
     def get_attn_cam(self):
-        return self.attn_cam
+        cam_copy = self.attn_cam.detach()
+        del self.attn_cam
+        return cam_copy
 
     def save_attn_gradients(self, attn_gradients):
         self.attn_gradients = attn_gradients
 
     def get_attn_gradients(self):
-        return self.attn_gradients
+        grad_copy = self.attn_gradients.detach()
+        del self.attn_gradients
+        return grad_copy
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
         new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)

@@ -29,9 +29,10 @@ class Generator:
 
     def generate_LRP(self, input_ids, attention_mask,
                      index=None, start_layer=11):
+     
         output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1].to(input_ids.device)
         kwargs = {"alpha": 1}
-
+        
         if index is None:
             index = np.argmax(output.cpu().data.numpy(), axis=-1)
 
@@ -45,7 +46,7 @@ class Generator:
         one_hot.backward(retain_graph=True)
 
         self.model.relprop(torch.tensor(one_hot_vector).to(input_ids.device), **kwargs)
-
+        
         cams = []
         blocks = self.model.roberta.encoder.layer
         for blk in blocks:
@@ -58,11 +59,12 @@ class Generator:
             cams.append(cam.unsqueeze(0))
         rollout = compute_rollout_attention(cams, start_layer=start_layer)
         rollout[:, 0, 0] = rollout[:, 0].min()
+        
         return rollout[:, 0]
 
     def generate_LRP_last_layer(self, input_ids, attention_mask,
                      index=None):
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1]
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1].to(input_ids.device)
         kwargs = {"alpha": 1}
         if index == None:
             index = np.argmax(output.cpu().data.numpy(), axis=-1)
@@ -71,7 +73,7 @@ class Generator:
         one_hot[0, index] = 1
         one_hot_vector = one_hot
         one_hot = torch.from_numpy(one_hot).requires_grad_(True)
-        one_hot = torch.sum(one_hot.cuda() * output)
+        one_hot = torch.sum(one_hot.to(input_ids.device) * output)
 
         self.model.zero_grad()
         one_hot.backward(retain_graph=True)
@@ -85,7 +87,7 @@ class Generator:
 
     def generate_full_lrp(self, input_ids, attention_mask,
                      index=None):
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1]
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1].to(input_ids.device)
         kwargs = {"alpha": 1}
 
         if index is None:
@@ -95,7 +97,7 @@ class Generator:
         one_hot[0, index] = 1
         one_hot_vector = one_hot
         one_hot = torch.from_numpy(one_hot).requires_grad_(True)
-        one_hot = torch.sum(one_hot.cuda() * output)
+        one_hot = torch.sum(one_hot.to(input_ids.device) * output)
 
         self.model.zero_grad()
         one_hot.backward(retain_graph=True)
@@ -107,7 +109,7 @@ class Generator:
 
     def generate_attn_last_layer(self, input_ids, attention_mask,
                      index=None):
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1]
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1].to(input_ids.device)
         cam = self.model.roberta.encoder.layer[-1].attention.self.get_attn()[0]
         cam = cam.mean(dim=0).unsqueeze(0)
         cam[:, 0, 0] = 0
@@ -115,7 +117,7 @@ class Generator:
 
     def generate_rollout(self, input_ids, attention_mask, start_layer=0, index=None):
         self.model.zero_grad()
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1]
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1].to(input_ids.device)
         blocks = self.model.roberta.encoder.layer
         all_layer_attentions = []
         for blk in blocks:
@@ -127,7 +129,7 @@ class Generator:
         return rollout[:, 0]
 
     def generate_attn_gradcam(self, input_ids, attention_mask, index=None):
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1]
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)[1].to(input_ids.device)
         kwargs = {"alpha": 1}
 
         if index == None:
